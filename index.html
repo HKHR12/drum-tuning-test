@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Drum Tuning Assistant</title>
+    <title>Drum Tuning Assistant (10 Lugs)</title>
     <style>
         :root {
             --primary-color: #2c3e50;
@@ -82,7 +82,7 @@
             color: #2ecc71;
         }
         .frequency.hold {
-            color: #f1c40f; /* ホールド時は黄色に */
+            color: #f1c40f;
         }
         .target-status {
             margin-top: 10px;
@@ -117,10 +117,10 @@
         button.secondary:hover {
             background: #95a5a6;
         }
-        /* ボルトメモ機能のスタイル */
+        /* ボルトメモ機能のスタイル（10個用にグリッドを最適化） */
         .bolt-grid {
             display: grid;
-            grid-template-columns: repeat(4, 11fr);
+            grid-template-columns: repeat(5, 1fr);
             gap: 8px;
             margin-top: 10px;
         }
@@ -201,7 +201,8 @@
         <label>シェルの大きさ（口径）と材質</label>
         <select id="size-select" onchange="updateTargetPitch()">
             <option value="14-wood">14 インチ / ウッドシェル (標準スネア等)</option>
-            <option value="14-metal">14 インチ / メタルシェル (ブラス・スチール等)</option>
+            <option value="14-metal">14 インチ / メタルシェル (10テンション等に多い)</option>
+            <option value="13-wood">13 インチ / ウッドシェル (小口径スネア・タム等)</option>
             <option value="10-wood">10 インチ / ウッドシェル (ハイタム)</option>
             <option value="12-wood">12 インチ / ウッドシェル (ロータム)</option>
             <option value="16-wood">16 インチ / ウッドシェル (フロアタム)</option>
@@ -235,7 +236,7 @@
     </div>
 
     <div class="setting-group">
-        <label>各テンションボルトの周波数メモ</label>
+        <label>各テンションボルトの周波数メモ（①〜⑩ 時計回り）</label>
         <div class="bolt-grid">
             <div class="bolt-box"><span>①</span><div id="bolt-1">--Hz</div><button class="bolt-btn" onclick="memoBolt(1)">記憶</button></div>
             <div class="bolt-box"><span>②</span><div id="bolt-2">--Hz</div><button class="bolt-btn" onclick="memoBolt(2)">記憶</button></div>
@@ -245,12 +246,14 @@
             <div class="bolt-box"><span>⑥</span><div id="bolt-6">--Hz</div><button class="bolt-btn" onclick="memoBolt(6)">記憶</button></div>
             <div class="bolt-box"><span>⑦</span><div id="bolt-7">--Hz</div><button class="bolt-btn" onclick="memoBolt(7)">記憶</button></div>
             <div class="bolt-box"><span>⑧</span><div id="bolt-8">--Hz</div><button class="bolt-btn" onclick="memoBolt(8)">記憶</button></div>
+            <div class="bolt-box"><span>⑨</span><div id="bolt-9">--Hz</div><button class="bolt-btn" onclick="memoBolt(9)">記憶</button></div>
+            <div class="bolt-box"><span>⑩</span><div id="bolt-10">--Hz</div><button class="bolt-btn" onclick="memoBolt(10)">記憶</button></div>
         </div>
         <button class="secondary" onclick="resetBolts()" style="padding: 6px; font-size: 12px; margin-top: 8px;">数値をリセット</button>
     </div>
 
     <div class="setting-group" style="display: flex; gap: 10px; margin-bottom: 10px;">
-        <input type="text" id="fav-memo" placeholder="メモ（例：マイ・スネア本番用）" style="flex: 2;">
+        <input type="text" id="fav-memo" placeholder="メモ（例：10ラグ・スネア用）" style="flex: 2;">
         <button onclick="saveFavorite()" style="flex: 1; margin: 0;">現在値を保存</button>
     </div>
 
@@ -268,9 +271,9 @@
     let audioContext = null;
     let analyser = null;
     let dataArray = null;
-    let isHold = false; // ホールド状態フラグ
+    let isHold = false;
 
-    // 基本ピッチのマスターデータ（材質による響きの違いを考慮して拡張）
+    // 基本ピッチのマスターデータ
     const targetMaster = {
         snare:  { top: { low: 180, medium: 240, high: 290 }, bottom: { low: 300, medium: 340, high: 380 } },
         tom:    { top: { low: 100, medium: 140, high: 180 }, bottom: { low: 110, medium: 150, high: 190 } },
@@ -285,7 +288,7 @@
         updateTargetPitch();
     }
 
-    // 【追加機能1】 ホールド機能の切り替え
+    // ホールド機能の切り替え
     function toggleHold() {
         isHold = !isHold;
         const btn = document.getElementById('hold-btn');
@@ -301,7 +304,7 @@
         }
     }
 
-    // 【追加機能2】 各ボルトの数値を記憶する
+    // 各ボルトの数値を記憶する処理（10番まで対応）
     function memoBolt(num) {
         if (currentHz === 0) {
             alert('まだ音を検知していません。');
@@ -310,29 +313,26 @@
         document.getElementById(`bolt-${num}`).innerText = `${currentHz}Hz`;
     }
 
-    // ボルト数値のリセット
+    // ボルト数値のリセット（10番までリセット）
     function resetBolts() {
-        for(let i=1; i<=8; i++) {
+        for(let i=1; i<=10; i++) {
             document.getElementById(`bolt-${i}`).innerText = '--Hz';
         }
     }
 
-    // 【追加機能3連動】 選択された条件から目安のHzを計算し、比率ナビを提示
+    // 選択された条件から目安のHzを計算し、比率ナビを提示
     function updateTargetPitch() {
         const part = document.getElementById('part-select').value;
         const pitch = document.getElementById('pitch-select').value;
         const sizeMaterial = document.getElementById('size-select').value;
         const ratioSetting = document.getElementById('ratio-select').value;
         
-        // ベースの目安を取得
         let baseHz = targetMaster[part][selectedSide][pitch];
 
-        // 材質による微調整（メタルシェルは少し高音の倍音が出やすいため、目安を数Hz高めに設定する例）
         if (sizeMaterial.includes('metal')) {
             baseHz = Math.round(baseHz * 1.05);
         }
 
-        // 表裏比率に応じたアドバイス文の生成
         let ratioAdvice = "";
         if (part === 'snare' || part === 'tom') {
             if (ratioSetting === 'bottom-high') {
@@ -340,7 +340,7 @@
             } else if (ratioSetting === 'bottom-low') {
                 ratioAdvice = selectedSide === 'top' ? "💡裏面(Bottom)はこれより 20〜30Hz ほど低くチューニングしてください" : "💡打面(Top)はこれより 20〜30Hz ほど高くチューニングしてください";
             } else {
-                ratioAdvice = "💡表裏を同じHzに揃えると、最も素直で長いサスティーンが得られます";
+                ratioAdvice = "💡表裏を同じHzに揃えると、最も素原で長いサスティーンが得られます";
             }
         } else {
             ratioAdvice = "バスドラムはミュート量（中の毛布など）でもピッチ感が大きく変わります";
@@ -375,7 +375,7 @@
 
     function updatePitchLoop() {
         requestAnimationFrame(updatePitchLoop);
-        if (isHold) return; // ホールド中は解析結果の画面更新をストップ
+        if (isHold) return;
 
         analyser.getFloatTimeDomainData(dataArray);
         const freq = autoCorrelate(dataArray, audioContext.sampleRate);
