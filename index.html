@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Drum Tuning Assistant</title>
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --accent-color: #e74c3c;
+            --bg-color: #f8f9fa;
+        }
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: #333;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        h1 {
+            text-align: center;
+            color: var(--primary-color);
+            margin-bottom: 25px;
+        }
+        .setting-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 8px;
+            color: var(--primary-color);
+        }
+        select, input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        .radio-tile-group {
+            display: flex;
+            gap: 10px;
+        }
+        .radio-tile {
+            flex: 1;
+            text-align: center;
+            padding: 10px;
+            border: 2px solid #ccc;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .radio-tile.active {
+            border-color: var(--accent-color);
+            background-color: #fdf2f2;
+            color: var(--accent-color);
+        }
+        /* チューナー表示部分 */
+        .tuner-display {
+            background: var(--primary-color);
+            color: #fff;
+            text-align: center;
+            padding: 30px 10px;
+            border-radius: 8px;
+            margin: 25px 0;
+        }
+        .frequency {
+            font-size: 48px;
+            font-weight: bold;
+            font-family: monospace;
+            color: #2ecc71;
+        }
+        .target-status {
+            margin-top: 10px;
+            font-size: 14px;
+            color: #bdc3c7;
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            background: var(--accent-color);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-bottom: 10px;
+            transition: background 0.2s;
+        }
+        button:hover {
+            background: #c0392b;
+        }
+        button.secondary {
+            background: #7f8c8d;
+        }
+        button.secondary:hover {
+            background: #95a5a6;
+        }
+        /* お気に入りリスト */
+        .favorite-list {
+            margin-top: 25px;
+            border-top: 2px solid #eee;
+            padding-top: 20px;
+        }
+        .favorite-item {
+            background: #f1f2f6;
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 14px;
+        }
+        .delete-btn {
+            background: none;
+            color: #95a5a6;
+            border: none;
+            cursor: pointer;
+            width: auto;
+            margin: 0;
+            padding: 0 5px;
+        }
+        .delete-btn:hover {
+            color: var(--accent-color);
+            background: none;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Drum Tuner</h1>
+
+    <button id="start-tuner-btn" onclick="initAudio()">チューナーを起動（マイクを許可）</button>
+
+    <div class="setting-group">
+        <label>パーツを選択</label>
+        <select id="part-select" onchange="updateTargetPitch()">
+            <option value="snare">スネアドラム</option>
+            <option value="tom">タムタム / フロアタム</option>
+            <option value="bass">バスドラム</option>
+        </select>
+    </div>
+
+    <div class="setting-group">
+        <label>面を選択</label>
+        <div class="radio-tile-group">
+            <div id="side-top" class="radio-tile active" onclick="setSide('top')">打面 (Top)</div>
+            <div id="side-bottom" class="radio-tile" onclick="setSide('bottom')">裏面 (Bottom)</div>
+        </div>
+    </div>
+
+    <div class="setting-group">
+        <label>シェルの大きさ（口径）</label>
+        <select id="size-select">
+            <option value="14">14 インチ (標準スネア等)</option>
+            <option value="10">10 インチ (ハイタム)</option>
+            <option value="12">12 インチ (ロータム)</option>
+            <option value="16">16 インチ (フロアタム)</option>
+            <option value="22">22 インチ (標準バスドラ)</option>
+        </select>
+    </div>
+
+    <div class="setting-group">
+        <label>目指すテンション（目安）</label>
+        <select id="pitch-select" onchange="updateTargetPitch()">
+            <option value="low">ローピッチ（太く低いサウンド）</option>
+            <option value="medium" selected>ミディアム（標準的なサウンド）</option>
+            <option value="high">ハイピッチ（抜けの良い高いサウンド）</option>
+        </select>
+    </div>
+
+    <div class="tuner-display">
+        <div id="hz-display" class="frequency">-- Hz</div>
+        <div id="target-hint" class="target-status">目安の周波数: -- Hz</div>
+    </div>
+
+    <div class="setting-group" style="display: flex; gap: 10px; margin-bottom: 10px;">
+        <input type="text" id="fav-memo" placeholder="メモ（例：マイ・スネア本番用）" style="flex: 2;">
+        <button onclick="saveFavorite()" style="flex: 1; margin: 0;">現在値を保存</button>
+    </div>
+
+    <div class="favorite-list">
+        <h3>保存したお気に入り設定</h3>
+        <div id="fav-container">
+            </div>
+    </div>
+</div>
+
+<script>
+    // 状態管理変数
+    let selectedSide = 'top';
+    let currentHz = 0;
+    let audioContext = null;
+    let analyser = null;
+    let dataArray = null;
+
+    // パーツ、ピッチ、面に応じた「目安の周波数(Hz)」のマスターデータ（数値は一般的な一例です）
+    const targetMaster = {
+        snare:  { top: { low: 180, medium: 250, high: 300 }, bottom: { low: 300, medium: 350, high: 400 } },
+        tom:    { top: { low: 100, medium: 140, high: 180 }, bottom: { low: 110, medium: 150, high: 190 } },
+        bass:   { top: { low: 50,  medium: 70,  high: 90 },  bottom: { low: 55,  medium: 75,  high: 95 } }
+    };
+
+    // 面（打面・裏面）の切り替え処理
+    function setSide(side) {
+        selectedSide = side;
+        document.getElementById('side-top').classList.toggle('active', side === 'top');
+        document.getElementById('side-bottom').classList.toggle('active', side === 'bottom');
+        updateTargetPitch();
+    }
+
+    // 選択された条件から目安のHzを計算して表示に反映
+    function updateTargetPitch() {
+        const part = document.getElementById('part-select').value;
+        const pitch = document.getElementById('pitch-select').value;
+        
+        const targetHz = targetMaster[part][selectedSide][pitch];
+        document.getElementById('target-hint').innerText = `目安の周波数: 約 ${targetHz} Hz`;
+    }
+
+    // マイク音声を解析して周波数を取得する処理（簡易オートコリレーション法）
+    async function initAudio() {
+        if (audioContext) return; // 既に起動してたら何もしない
+
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            analyser = audioContext.createAnalyser();
+            analyser.fftSize = 2048;
+            
+            const source = audioContext.createMediaStreamSource(stream);
+            source.connect(analyser);
+            
+            dataArray = new Float32Array(analyser.fftSize);
+            document.getElementById('start-tuner-btn').style.display = 'none'; // 起動したらボタンを隠す
+            
+            updatePitchLoop();
+        } catch (err) {
+            alert('マイクのアクセスが拒否されたか、マイクが見つかりません。');
+            console.error(err);
+        }
+    }
+
+    // リアルタイムで音声をループ解析する関数
+    function updatePitchLoop() {
+        requestAnimationFrame(updatePitchLoop);
+        analyser.getFloatTimeDomainData(dataArray);
+        
+        // 自己相関法による簡易ピッチ検出
+        const freq = autoCorrelate(dataArray, audioContext.sampleRate);
+        
+        if (freq !== -1 && freq > 30 && freq < 1000) { // ドラムの現実的な周波数帯に絞る
+            currentHz = Math.round(freq);
+            document.getElementById('hz-display').innerText = `${currentHz} Hz`;
+        }
+    }
+
+    // ピッチ検出アルゴリズム（自己相関法）
+    function autoCorrelate(buffer, sampleRate) {
+        let SIZE = buffer.length;
+        let rms = 0;
+
+        for (let i = 0; i < SIZE; i++) {
+            let val = buffer[i];
+            rms += val * val;
+        }
+        rms = Math.sqrt(rms / SIZE);
+        if (rms < 0.01) return -1; // 音が小さすぎる場合は無視
+
+        let r1 = 0, r2 = SIZE - 1, thres = 0.2;
+        for (let i = 0; i < SIZE / 2; i++) {
+            if (Math.abs(buffer[i]) < thres) { r1 = i; break; }
+        }
+        for (let i = SIZE - 1; i >= SIZE / 2; i--) {
+            if (Math.abs(buffer[i]) < thres) { r2 = i; break; }
+        }
+
+        buffer = buffer.slice(r1, r2);
+        SIZE = buffer.length;
+
+        let c = new Float32Array(SIZE);
+        for (let i = 0; i < SIZE; i++) {
+            for (let j = 0; j < SIZE - i; j++) {
+                c[i] = c[i] + buffer[j] * buffer[j + i];
+            }
+        }
+
+        let d = 0;
+        while (c[d] > c[d + 1]) d++;
+        let maxval = -1, maxpos = -1;
+        for (let i = d; i < SIZE; i++) {
+            if (c[i] > maxval) {
+                maxval = c[i];
+                maxpos = i;
+            }
+        }
+        let T0 = maxpos;
+
+        let x1 = c[T0 - 1], x2 = c[T0], x3 = c[T0 + 1];
+        let a = (x1 + x3 - 2 * x2) / 2;
+        let b = (x3 - x1) / 2;
+        if (a) T0 = T0 - b / (2 * a);
+
+        return sampleRate / T0;
+    }
+
+    // お気に入り保存機能（ブラウザのLocalStorageを使用）
+    function saveFavorite() {
+        if (currentHz === 0) {
+            alert('まだ音を検知していないか、周波数が表示されていません。');
+            return;
+        }
+
+        const partText = document.getElementById('part-select').options[document.getElementById('part-select').selectedIndex].text;
+        const sizeText = document.getElementById('size-select').value;
+        const sideText = selectedSide === 'top' ? '打面' : '裏面';
+        const memo = document.getElementById('fav-memo').value || 'マイ設定';
+
+        const favItem = {
+            id: Date.now(),
+            text: `[${partText} ${sizeText}" ${sideText}] ${currentHz}Hz - ${memo}`
+        };
+
+        let favorites = JSON.parse(localStorage.getItem('drum_favorites')) || [];
+        favorites.push(favItem);
+        localStorage.setItem('drum_favorites', JSON.stringify(favorites));
+
+        document.getElementById('fav-memo').value = ''; // 入力欄リセット
+        renderFavorites();
+    }
+
+    // お気に入りリストの描画
+    function renderFavorites() {
+        const container = document.getElementById('fav-container');
+        container.innerHTML = '';
+        const favorites = JSON.parse(localStorage.getItem('drum_favorites')) || [];
+
+        favorites.forEach(item => {
+            const div = document.createElement('div');
+            div.className = 'favorite-item';
+            div.innerHTML = `
+                <span>${item.text}</span>
+                <button class="delete-btn" onclick="deleteFavorite(${item.id})">削除</button>
+            `;
+            container.appendChild(div);
+        });
+    }
+
+    // お気に入り削除
+    function deleteFavorite(id) {
+        let favorites = JSON.parse(localStorage.getItem('drum_favorites')) || [];
+        favorites = favorites.filter(item => item.id !== id);
+        localStorage.setItem('drum_favorites', JSON.stringify(favorites));
+        renderFavorites();
+    }
+
+    // 初期化表示
+    window.onload = () => {
+        updateTargetPitch();
+        renderFavorites();
+    };
+</script>
+
+</body>
+</html>
